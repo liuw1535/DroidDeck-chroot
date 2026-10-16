@@ -1174,6 +1174,8 @@
     <string name="game_shortcut_scanning">Scanning installed games…</string>
     <string name="game_link_copy">Copy launch link</string>
     <string name="game_link_copied">Launch link copied</string>
+    <string name="chroot_no_desktop">Desktop is disabled while the chroot runtime is in use.</string>
+    <string name="chroot_no_flatpak">Flatpak install is disabled while the chroot runtime is in use.</string>
     <string name="game_shortcut_unsupported">This launcher cannot add shortcuts. Use Copy launch link instead.</string>
     <string name="game_link_invalid">Invalid game launch link.</string>
     <string name="game_link_missing">This game is no longer in your DroidDeck library.</string>

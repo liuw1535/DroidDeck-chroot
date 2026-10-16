@@ -21,7 +21,10 @@ class App : Application() {
         com.droiddeck.launcher.session.SessionPrefs.settleGpuDriverMode(this)
         com.droiddeck.launcher.update.AppUpdates.init(this)
         GpuClockPin.clearLeftover(this)
-        BwrapSpawner.start(this)
+        if (com.droiddeck.launcher.session.SessionPrefs.runtimeBackend(this) ==
+            com.droiddeck.launcher.session.SessionPrefs.BACKEND_PROOT) {
+            BwrapSpawner.start(this)
+        }
         com.droiddeck.launcher.frontend.GameFileSync.start(this)
         com.droiddeck.launcher.stores.StoresState.init(this)
         com.droiddeck.launcher.stores.StoresState.register(com.droiddeck.launcher.stores.gog.GogBackend)

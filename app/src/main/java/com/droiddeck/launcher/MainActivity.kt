@@ -631,8 +631,13 @@ class MainActivity : ComponentActivity() {
                             android.widget.Toast.makeText(this, R.string.game_link_copied, android.widget.Toast.LENGTH_SHORT).show()
                         },
                         onDesktop = {
-                            startSession(Intent(this, SessionActivity::class.java)
-                                .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_DESKTOP))
+                            if (com.droiddeck.launcher.session.SessionPrefs.runtimeBackend(this) ==
+                                com.droiddeck.launcher.session.SessionPrefs.BACKEND_CHROOT) {
+                                android.widget.Toast.makeText(this, R.string.chroot_no_desktop, android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                startSession(Intent(this, SessionActivity::class.java)
+                                    .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_DESKTOP))
+                            }
                         },
                         onEmulator = { e -> launchProgram(e.program) },
                         onUserApp = { app ->
@@ -643,11 +648,16 @@ class MainActivity : ComponentActivity() {
                                 .putExtra(SessionService.EXTRA_PROGRAM_ARGS, app.args.toTypedArray()))
                         },
                         onFlatpakApp = { id, name ->
-                            Library.flatpakNames[id] = name
-                            startActivity(Intent(this, SessionActivity::class.java)
-                                .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
-                                .putExtra(SessionService.EXTRA_PROGRAM, com.droiddeck.launcher.runtime.FlatpakManager.LAUNCHER)
-                                .putExtra(SessionService.EXTRA_PROGRAM_ARGS, arrayOf(id)))
+                            if (com.droiddeck.launcher.session.SessionPrefs.runtimeBackend(this) ==
+                                com.droiddeck.launcher.session.SessionPrefs.BACKEND_CHROOT) {
+                                android.widget.Toast.makeText(this, R.string.chroot_no_flatpak, android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                Library.flatpakNames[id] = name
+                                startActivity(Intent(this, SessionActivity::class.java)
+                                    .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
+                                    .putExtra(SessionService.EXTRA_PROGRAM, com.droiddeck.launcher.runtime.FlatpakManager.LAUNCHER)
+                                    .putExtra(SessionService.EXTRA_PROGRAM_ARGS, arrayOf(id)))
+                            }
                         },
                         onRom = { g ->
                             val e = emulatorList.first { it.id == g.emulatorId }

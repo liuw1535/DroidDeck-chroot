@@ -69,6 +69,13 @@ class AgentStartActivity : Activity() {
                 return
             }
         }
+        if (sessionMode == SessionService.MODE_DESKTOP &&
+            com.droiddeck.launcher.session.SessionPrefs.runtimeBackend(this) ==
+            com.droiddeck.launcher.session.SessionPrefs.BACKEND_CHROOT) {
+            Log.w(TAG, "desktop mode disabled under the chroot backend")
+            finish()
+            return
+        }
 
         val program = if (sessionMode == SessionService.MODE_RUN) {
             request.optString("program").takeIf { it.isNotBlank() }

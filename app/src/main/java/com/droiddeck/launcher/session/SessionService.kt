@@ -39,6 +39,7 @@ import com.droiddeck.launcher.frontend.GameLaunchLink
 import com.droiddeck.launcher.input.FakeInputWriter
 import com.droiddeck.launcher.input.SteamControllerBle
 import com.droiddeck.launcher.runtime.BwrapSpawner
+import com.droiddeck.launcher.runtime.ChrootRuntime
 import com.droiddeck.launcher.runtime.LinuxNetworkLinkComponent
 import com.droiddeck.launcher.runtime.LinuxRuntime
 import com.droiddeck.launcher.runtime.ProotFastPath
@@ -388,41 +389,50 @@ class SessionService : Service() {
 
         FileUtils.clear(File(cacheDir, "shm"))
 
+        val chroot = ChrootRuntime.backendEnabled(this)
         val binds = sessionBinds(controllersOn, fakeInputDir, sessionDir, guest, sessionRoot, runtimeDir)
-        val fastPathKey = if (ProotFastPath.enabled(this)) {
-            val prootBinds = LinuxRuntime.binds(
-                this, sessionRoot, runtimeDir, Environment.getExternalStorageDirectory(), binds,
-            )
-            val root = LinuxRuntime.rootDir(this)
-            ProotFastPath.key(root, prootBinds)?.also { key ->
-                val env = ProotFastPath.guestEnv(root, prootBinds, key)
-                guest.addAll(fastPathAt, env)
-                shellGuest.addAll(fastPathAt, env)
-                Log.i(TAG, "proot: fast path on (${prootBinds.size} binds)")
-            } ?: run {
-                Log.w(TAG, "proot: fast path off - ${prootBinds.size} binds (it holds ${ProotFastPath.MAX_BINDS}) or a path it cannot be told")
-                null
-            }
-        } else null
-
-        val command = LinuxRuntime.command(
-            this, sessionRoot, runtimeDir, Environment.getExternalStorageDirectory(), binds, guest,
+        val fullBinds = LinuxRuntime.binds(
+            this, sessionRoot, runtimeDir, Environment.getExternalStorageDirectory(), binds,
         )
 
+        val command: List<String>
         val hostEnv = HostEnvironment()
-        hostEnv["PROOT_LOADER"] = LinuxRuntime.prootLoader(this).path
-        hostEnv["PROOT_TMP_DIR"] = cacheDir.path
-        if (SessionPrefs.prootNoSeccomp(this)) {
-            hostEnv["PROOT_NO_SECCOMP"] = "1"
-            Log.i(TAG, "proot: seccomp acceleration off by request")
-        }
-        fastPathKey?.let { ProotFastPath.hostEnv(it).let { (k, v) -> hostEnv[k] = v } }
-        val prootLibs = LinuxRuntime.prootLibraryPath(this)
-        if (prootLibs.isNotEmpty()) hostEnv["LD_LIBRARY_PATH"] = prootLibs
+        if (chroot) {
+            val c = ChrootRuntime.command(this, guest, fullBinds, false)
+            command = c.argv
+            c.hostEnv.forEach { (k, v) -> hostEnv[k] = v }
+            Log.i(TAG, "chroot backend: ${fullBinds.size} binds, su=${command.first()}")
+        } else {
+            val fastPathKey = if (ProotFastPath.enabled(this)) {
+                val root = LinuxRuntime.rootDir(this)
+                ProotFastPath.key(root, fullBinds)?.also { key ->
+                    val env = ProotFastPath.guestEnv(root, fullBinds, key)
+                    guest.addAll(fastPathAt, env)
+                    shellGuest.addAll(fastPathAt, env)
+                    Log.i(TAG, "proot: fast path on (${fullBinds.size} binds)")
+                } ?: run {
+                    Log.w(TAG, "proot: fast path off - ${fullBinds.size} binds (it holds ${ProotFastPath.MAX_BINDS}) or a path it cannot be told")
+                    null
+                }
+            } else null
 
-        val terminalCommand = LinuxRuntime.command(
-            this, sessionRoot, runtimeDir, Environment.getExternalStorageDirectory(), binds, shellGuest,
-        )
+            command = LinuxRuntime.command(
+                this, sessionRoot, runtimeDir, Environment.getExternalStorageDirectory(), binds, guest)
+            hostEnv["PROOT_LOADER"] = LinuxRuntime.prootLoader(this).path
+            hostEnv["PROOT_TMP_DIR"] = cacheDir.path
+            if (SessionPrefs.prootNoSeccomp(this)) {
+                hostEnv["PROOT_NO_SECCOMP"] = "1"
+                Log.i(TAG, "proot: seccomp acceleration off by request")
+            }
+            fastPathKey?.let { ProotFastPath.hostEnv(it).let { (k, v) -> hostEnv[k] = v } }
+            val prootLibs = LinuxRuntime.prootLibraryPath(this)
+            if (prootLibs.isNotEmpty()) hostEnv["LD_LIBRARY_PATH"] = prootLibs
+        }
+
+        val terminalCommand: List<String> =
+            if (chroot) ChrootRuntime.command(this, shellGuest, null, false).argv
+            else LinuxRuntime.command(
+                this, sessionRoot, runtimeDir, Environment.getExternalStorageDirectory(), binds, shellGuest)
         val terminalHostEnvironment = LinkedHashMap(System.getenv())
         hostEnv.asArray().forEach { entry ->
             val separator = entry.indexOf('=')
@@ -516,7 +526,9 @@ class SessionService : Service() {
     private fun addClientEnvironment(guest: MutableList<String>, steamHere: Boolean) {
         guest.add("/usr/bin/env")
         guest.add("-i")
-        guest.add("DROIDDECK_BWRAP_SOCKET=" + com.droiddeck.launcher.runtime.BwrapSpawner.socket(this))
+        if (SessionPrefs.runtimeBackend(this) == SessionPrefs.BACKEND_PROOT) {
+            guest.add("DROIDDECK_BWRAP_SOCKET=" + com.droiddeck.launcher.runtime.BwrapSpawner.socket(this))
+        }
         guest.add("HOME=/root")
         guest.add("USER=root")
         guest.add("PATH=/usr/local/bin:/usr/bin:/bin")
@@ -1364,6 +1376,7 @@ class SessionService : Service() {
                     auxiliary.forEach { (pid, started) -> teardown(pid, started) }
                     if (prootPid > 1) teardown(prootPid)
                     killGuestLeftovers()
+                    if (ChrootRuntime.backendEnabled(this)) ChrootRuntime.stop(this)
                     finishSessionStop(status, stoppedGen)
                 }, "session-teardown").start()
             } else {

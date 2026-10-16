@@ -373,6 +373,18 @@ object SessionPrefs {
         prefs(context).edit().putBoolean("prootFastPath", on).apply()
     }
 
+    const val BACKEND_PROOT = "proot"
+    const val BACKEND_CHROOT = "chroot"
+
+    /** Runtime container: proot (no root) or chroot (needs a rooted device, runs the guest as root). */
+    fun runtimeBackend(context: Context): String =
+        prefs(context).getString("runtimeBackend", BACKEND_PROOT) ?: BACKEND_PROOT
+
+    fun setRuntimeBackend(context: Context, backend: String) {
+        require(backend == BACKEND_PROOT || backend == BACKEND_CHROOT)
+        prefs(context).edit().putString("runtimeBackend", backend).apply()
+    }
+
     const val DEFAULT_GUEST_HOSTNAME = "DroidDeck"
 
     @JvmStatic

@@ -393,6 +393,8 @@ object UserApps {
     }
 
     private fun addFlatpak(context: Context, id: String, name: String?, icon: File?, onProgress: (String, Int) -> Unit): String? {
+        if (com.droiddeck.launcher.session.SessionPrefs.runtimeBackend(context) == com.droiddeck.launcher.session.SessionPrefs.BACKEND_CHROOT)
+            return context.getString(R.string.chroot_no_flatpak)
         if (!FlatpakManager.ready(context)) FlatpakManager.setup(context, onProgress)?.let { return it }
         FlatpakManager.install(context, id, onProgress)?.let { return it }
         customiseFlatpak(context, id, name, icon)
@@ -400,6 +402,8 @@ object UserApps {
     }
 
     private fun addFlatpakBundle(context: Context, file: File, name: String?, icon: File?, onProgress: (String, Int) -> Unit): String? {
+        if (com.droiddeck.launcher.session.SessionPrefs.runtimeBackend(context) == com.droiddeck.launcher.session.SessionPrefs.BACKEND_CHROOT)
+            return context.getString(R.string.chroot_no_flatpak)
         if (!file.isFile) return context.getString(R.string.user_apps_file_gone)
         if (!FlatpakManager.ready(context)) FlatpakManager.setup(context, onProgress)?.let { return it }
         val shared = Environment.getExternalStorageDirectory().canonicalPath
