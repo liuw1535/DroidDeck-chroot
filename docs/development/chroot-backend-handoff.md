@@ -104,11 +104,16 @@ cd /home/liuw/droid/DroidDeck
 3. `ChrootRuntime.kt` 用了 `android.system.Os.chmod`、`context.assets.open` — import 已写全。
 4. `Os.chmod(script.path, 0b111101101)` — 0755 的二进制字面量,确认 Kotlin 接受。
 
-### B. 开关入口(尚未做 UI)
-目前只能通过代码改 `SessionPrefs.setRuntimeBackend(context, "chroot")` 或直接改
-"session" SharedPreferences 切换。**还没有设置界面项**让用户切换后端。下一步应在 Setup
-里加一个开关(参考 `prootNoSeccomp` 的设置项模式)。建议位置:`MainActivity` 的 Setup/
-Advanced 面板,或新建 `RuntimeSettings`。
+### B. 开关入口（已完成 UI）
+已在 Performance 对话框的「Session fixes」组顶部加了一个 **chroot runtime (root)** 开关
+(commit `eca5c14e`)。开启时:
+- 写入 `SessionPrefs.runtimeBackend = BACKEND_CHROOT`(关闭则回 `BACKEND_PROOT`)。
+- 下方 proot 专用的 seccomp / fast-path 两个开关自动禁用(chroot 下 proot 不跑)。
+- hint 文案提示:需 root、desktop 和 Flatpak 被禁用、下次会话生效。
+`runtimeBackend` 也已加入 `SettingsReset` 的 SESSION_KEYS(重置设置会清掉)并在
+`DeviceReport` 里报告一行(`runtime backend`),便于 logcat 诊断。改动文件:
+`PerformanceDialog.kt` / `MainActivity.kt` / `strings.xml`(perf_chroot*, perf_fastpath_off_chroot) /
+`SettingsReset.kt` / `DeviceReport.kt`。
 
 ### C. 设备实测要点
 切到 chroot 后端后,在已 root 设备上验证:
