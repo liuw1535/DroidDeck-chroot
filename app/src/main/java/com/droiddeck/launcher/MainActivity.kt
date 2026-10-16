@@ -145,6 +145,7 @@ class MainActivity : ComponentActivity() {
     private var gamescopeRealtime by mutableStateOf(false)
     private var gpuClockPin by mutableStateOf(false)
     private var runtimeBackend by mutableStateOf(SessionPrefs.BACKEND_PROOT)
+    private var rootAvailable by mutableStateOf(false)
     private var prootNoSeccomp by mutableStateOf(false)
     private var prootFastPath by mutableStateOf(true)
     private var guestHostname by mutableStateOf(SessionPrefs.DEFAULT_GUEST_HOSTNAME)
@@ -508,6 +509,7 @@ class MainActivity : ComponentActivity() {
         gameSyncFolder = GameFileSync.folder(this)
         displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
         refreshPhantomStatus()
+        probeRoot()
         theme = SessionPrefs.theme(this)
         frameGenLabel = getString(R.string.frame_gen_off)
         appScale = com.droiddeck.launcher.core.AppUiPrefs.scale(this)
@@ -1410,7 +1412,7 @@ class MainActivity : ComponentActivity() {
             fsyncFirst = fsyncFirst,
             gamescopeRealtime = gamescopeRealtime,
             gpuClockPin = gpuClockPin,
-            runtimeBackend = runtimeBackend, prootNoSeccomp = prootNoSeccomp, prootFastPath = prootFastPath, guestHostname = guestHostname, phantomWarning = phantomWarning,
+            runtimeBackend = runtimeBackend, prootNoSeccomp = prootNoSeccomp, prootFastPath = prootFastPath, guestHostname = guestHostname, phantomWarning = phantomWarning, rootAvailable = rootAvailable,
             onClientOverride = { on -> SessionPrefs.setClientCpusOverride(this, on); clientOverride = on },
             onTuSysmem = { on -> SessionPrefs.setTuSysmem(this, on); tuSysmem = on },
             onZinkLazy = { on -> SessionPrefs.setZinkLazy(this, on); zinkLazy = on },
@@ -1557,6 +1559,13 @@ class MainActivity : ComponentActivity() {
         gameStorage = path
     }
 
+    private fun probeRoot() {
+        Thread({
+            val r = com.droiddeck.launcher.runtime.ChrootRuntime.rootAvailable(this)
+            ui.post { rootAvailable = r }
+        }, "root-probe").start()
+    }
+
     private fun refreshCores() {
         clientOverride = SessionPrefs.clientCpusOverride(this)
         glThread = SessionPrefs.glThread(this)
@@ -1572,6 +1581,7 @@ class MainActivity : ComponentActivity() {
         gamescopeRealtime = SessionPrefs.gamescopeRealtime(this)
         gpuClockPin = SessionPrefs.gpuClockPin(this)
         runtimeBackend = SessionPrefs.runtimeBackend(this)
+        if (com.droiddeck.launcher.runtime.ChrootRuntime.probedRootAvailable() == null) probeRoot()
         prootNoSeccomp = SessionPrefs.prootNoSeccomp(this)
         prootFastPath = SessionPrefs.prootFastPath(this)
         guestHostname = SessionPrefs.guestHostname(this)

@@ -49,6 +49,7 @@ fun PerformancePage(
     prootFastPath: Boolean,
     guestHostname: String,
     phantomWarning: String?,
+    rootAvailable: Boolean,
     onClientOverride: (Boolean) -> Unit,
     onTuSysmem: (Boolean) -> Unit,
     onZinkLazy: (Boolean) -> Unit,
@@ -127,8 +128,10 @@ fun PerformancePage(
         SettingsGroup(stringResource(R.string.perf_fixes)) {
             ToggleRow(
                 host, "chroot", stringResource(R.string.perf_chroot),
-                if (chroot) stringResource(R.string.perf_chroot_on) else stringResource(R.string.perf_chroot_hint),
-                chroot, onChange = onRuntimeBackend,
+                if (!rootAvailable) stringResource(R.string.perf_chroot_no_root)
+                else if (chroot) stringResource(R.string.perf_chroot_on)
+                else stringResource(R.string.perf_chroot_hint),
+                chroot, enabled = rootAvailable, onChange = onRuntimeBackend,
             )
             ToggleRow(
                 host, "sysmem", stringResource(R.string.perf_sysmem),

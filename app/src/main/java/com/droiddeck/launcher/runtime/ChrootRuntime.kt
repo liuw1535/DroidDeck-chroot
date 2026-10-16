@@ -40,6 +40,36 @@ object ChrootRuntime {
 
     fun available(): Boolean = suBinary() != null
 
+    @Volatile
+    private var probedRoot: Boolean? = null
+
+    /**
+     * Probe whether root is actually usable: a su binary that can run a command as uid 0. Blocking
+     * (spawns su, which may show a Magisk/KSU authorization prompt) -- call from a background
+     * thread only. Caches the result so DeviceReport can report it without re-prompting.
+     *
+     * Do NOT use Os.getuid() == 0: that is the app's own uid, never 0 for a normal app, and says
+     * nothing about whether root was granted to us.
+     */
+    fun rootAvailable(context: Context): Boolean {
+        val su = suBinary() ?: run { probedRoot = false; Log.i(TAG, "root probe: no su binary"); return false }
+        return try {
+            val p = ProcessBuilder(su, "-c", "id -u").redirectErrorStream(true).start()
+            val out = p.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }.trim()
+            val ok = p.waitFor() == 0 && out == "0"
+            probedRoot = ok
+            Log.i(TAG, "root probe: su=$su ok=$ok out=<$out>")
+            ok
+        } catch (e: Exception) {
+            Log.w(TAG, "root probe failed", e)
+            probedRoot = false
+            false
+        }
+    }
+
+    /** Last probed root state, or null if never probed. Does not spawn su / does not prompt. */
+    fun probedRootAvailable(): Boolean? = probedRoot
+
     fun backendEnabled(context: Context): Boolean = SessionPrefs.runtimeBackend(context) == BACKEND
 
     data class Command(val argv: List<String>, val hostEnv: Map<String, String>)

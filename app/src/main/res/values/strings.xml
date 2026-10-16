@@ -542,6 +542,7 @@
     <string name="perf_chroot">chroot runtime (root)</string>
     <string name="perf_chroot_hint">Run the guest in a real chroot instead of proot. Needs a rooted device; desktop and Flatpak are disabled while on. Applies next session.</string>
     <string name="perf_chroot_on">Runs the guest as root in a real chroot. Desktop and Flatpak are disabled. Needs a rooted device. Applies next session.</string>
+    <string name="perf_chroot_no_root">Needs root (a working su).</string>
     <string name="perf_identity">Session identity</string>
     <string name="perf_hostname">Host name</string>
     <string name="perf_hostname_hint">The name Steam sees for this device. Blank restores %1$s.</string>

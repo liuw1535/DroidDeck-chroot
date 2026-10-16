@@ -154,6 +154,8 @@ object DeviceReport {
         k("gamescope realtime", SessionPrefs.gamescopeRealtime(context))
         k("proot without seccomp", SessionPrefs.prootNoSeccomp(context))
         k("runtime backend", SessionPrefs.runtimeBackend(context))
+        k("root available", com.droiddeck.launcher.runtime.ChrootRuntime.probedRootAvailable()
+            ?: (com.droiddeck.launcher.runtime.ChrootRuntime.suBinary()?.let { "su present (not probed)" } ?: "no su"))
         k("proot fast path", SessionPrefs.prootFastPath(context))
         k("Guest host name", SessionPrefs.guestHostname(context))
         k("DirectAudio for games", SessionPrefs.directAudio(context))
