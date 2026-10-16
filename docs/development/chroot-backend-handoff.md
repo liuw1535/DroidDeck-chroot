@@ -136,6 +136,37 @@ cd /home/liuw/droid/DroidDeck
 - **rootfs 内仍需的假 proc/sys**(GPU sysfs 树、cpuinfo 等):`binds()` 已造好 host 侧
   文件,chroot 照挂即可;但若 root 下真 `/proc`/`/sys` 可读,部分假文件可移除(优化项,
   非阻塞)。
+- **chroot 开关在无 root 时应置灰(待办)**:目前 Performance 对话框里的 `chroot runtime
+  (root)` 开关在任何设备上都能点开,非 root 设备点开后下次会话会直接失败(找不到 su /
+  su 提权失败)。应在 UI 侧根据设备是否真有 root 来决定开关可用性,而非让用户踩坑。
+
+  **验收标准**:应用未被授予 root(su 找不到,或 su 能跑但 `id -u` ≠ 0)时,开关
+  置灰、不可勾选;hint 文案换成“Needs root (a working su).”。反之正常可用。
+
+  **实现思路**(给新会话):
+  1. 在 `ChrootRuntime` 里加一个 `rootAvailable(context): Boolean` 探测函数
+     (或复用现有 `suBinary()`,它在 `ChrootRuntime.kt` 里已遍历 Magisk/KSU 标准位置
+     找 su,直接拿来用)。
+  2. 探测逻辑:`suBinary()` 返回 null → 无 root → false。找到 su 后,异步跑一次
+     `su -c id -u` 取 stdout,trim 后 `== "0"` 才算真 root;su 不弹授权框或拒绝授权
+     时该命令会失败(非 0 退出 / 无输出)→ 一并判 false。**不要用 `Os.getuid() == 0`
+     判定**——那是 app 自己的 uid,普通 app 永远不是 0,跟有没有 root 授权无关。
+  3. 缓存:在 `MainActivity` 启动时(`onCreate` / 首次 `refresh`)后台跑一次探测,把
+     结果存进一个 `rootAvailable` state(默认 false,避免冷启动闪一下可点)。探测是
+     异步 I/O(起进程跑 su),务必在子线程做,`ui.post` 回主线程写 state。
+  4. UI:`PerformanceDialog` 的 chroot `ToggleRow` 传 `enabled = rootAvailable &&
+     !<其它已禁用条件>`;当前代码里它没传 `enabled`(默认 true),改成依赖
+     `rootAvailable`。hint 在 `!rootAvailable` 时显示 `R.string.perf_chroot_no_root`
+     (新字符串,如 “Needs root (a working su).”)。
+  5. 边界:探测结果只在启动时取一次;若用户在 app 运行期间才去系统里授予 root
+     (如装 Magisk 后),需重启 app 才生效——可接受,文档里注明。若想更主动,可在打开
+     Performance 对话框时(`onPerformance` → `refreshCores()` 那条路径)再探一次。
+  6. 文案复用:已有 `chroot_no_desktop` / `chroot_no_flatpak` 是 toast 用的;这里需要
+     新增一个 settings hint 串,别复用那两条(语义不同)。
+
+  涉及文件:`ChrootRuntime.kt`(加探测)、`MainActivity.kt`(state + 启动探测)、
+  `PerformanceDialog.kt`(`enabled` 依赖 + hint 分支)、`strings.xml`(新 hint 串)、
+  可能 `DeviceReport.kt`(报告一行 `root available` 方便 logcat 诊断)。
 
 ---
 
