@@ -96,6 +96,7 @@ object ChrootRuntime {
         val bindsFile = File(context.cacheDir, "chroot-binds-$n.txt")
         val bindsRevFile = File(context.cacheDir, "chroot-binds-rev-$n.txt")
 
+        val piggyback = binds == null
         val effective = binds ?: emptyList()
         bindsFile.writeText(effective.joinToString("\n") + "\n")
         bindsRevFile.writeText(effective.asReversed().joinToString("\n") + "\n")
@@ -107,11 +108,12 @@ object ChrootRuntime {
             .replace("__APP_PID__", appPid.toString())
             .replace("__BINDS_FILE__", bindsFile.path)
             .replace("__BINDS_REV_FILE__", bindsRevFile.path)
+            .replace("__PIGGYBACK__", if (piggyback) "1" else "0")
             .replace("__GUEST__", quotedGuest)
         script.writeText(scriptText)
         Os.chmod(script.path, 0b111101101) // 0755
 
-        Log.i(TAG, "staged chroot entry ${script.path} (${effective.size} binds) su=$su")
+        Log.i(TAG, "staged chroot entry ${script.path} (${effective.size} binds, piggyback=$piggyback) su=$su")
         return Command(listOf(su, "-c", script.path), emptyMap())
     }
 

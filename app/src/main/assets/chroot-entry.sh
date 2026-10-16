@@ -9,6 +9,7 @@ ROOT='__ROOT__'
 APP_PID=__APP_PID__
 BINDS_FILE='__BINDS_FILE__'
 BINDS_REV_FILE='__BINDS_REV_FILE__'
+PIGGYBACK=__PIGGYBACK__
 CLEANED=0
 
 mount_binds() {
@@ -44,7 +45,6 @@ cleanup_mounts() {
         while IFS= read -r spec; do
             [ -n "$spec" ] || continue
             guest=${spec#*:}
-            [ "$guest" = "$spec" ] || :
             umount -l "$ROOT$guest" 2>/dev/null || true
         done < "$BINDS_REV_FILE"
     fi
@@ -58,19 +58,29 @@ cleanup() {
     [ "$CLEANED" = 1 ] && return 0
     CLEANED=1
     trap '' EXIT INT TERM HUP
+    # A piggyback terminal rides an already-running session's mounts and must not
+    # tear them down on exit -- killing rootfs processes or unmounting here would
+    # take the whole Steam/gamescope session down with the terminal.
+    if [ "$PIGGYBACK" = 1 ]; then
+        rm -f "$BINDS_FILE" "$BINDS_REV_FILE"
+        return 0
+    fi
     kill_in_root
     cleanup_mounts
     rm -f "$BINDS_FILE" "$BINDS_REV_FILE"
 }
 trap cleanup EXIT INT TERM HUP
 
-# If the app dies, no one will signal us; the watchdog cleans up and leaves.
-( while kill -0 "$APP_PID" 2>/dev/null; do sleep 5; done; cleanup ) &
-WATCHDOG=$!
+WATCHDOG=
+if [ "$PIGGYBACK" != 1 ]; then
+    # If the app dies, no one will signal us; the watchdog cleans up and leaves.
+    ( while kill -0 "$APP_PID" 2>/dev/null; do sleep 5; done; cleanup ) &
+    WATCHDOG=$!
+fi
 
 mount_binds
 setsid chroot "$ROOT" __GUEST__
 RC=$?
-kill "$WATCHDOG" 2>/dev/null || true
+[ -n "$WATCHDOG" ] && kill "$WATCHDOG" 2>/dev/null || true
 cleanup
 exit "$RC"
