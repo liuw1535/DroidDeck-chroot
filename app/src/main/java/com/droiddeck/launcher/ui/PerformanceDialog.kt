@@ -44,6 +44,7 @@ fun PerformancePage(
     fsyncFirst: Boolean,
     gamescopeRealtime: Boolean,
     gpuClockPin: Boolean,
+    runtimeBackend: String,
     prootNoSeccomp: Boolean,
     prootFastPath: Boolean,
     guestHostname: String,
@@ -59,6 +60,7 @@ fun PerformancePage(
     onFsyncFirst: (Boolean) -> Unit,
     onGamescopeRealtime: (Boolean) -> Unit,
     onGpuClockPin: (Boolean) -> Unit,
+    onRuntimeBackend: (Boolean) -> Unit,
     onProotNoSeccomp: (Boolean) -> Unit,
     onProotFastPath: (Boolean) -> Unit,
     onGuestHostname: (String) -> Unit,
@@ -69,6 +71,7 @@ fun PerformancePage(
     val host = rememberMenuHost()
     val colors = MaterialTheme.colorScheme
     val coreItems = cores.map { it.core to it.label }
+    val chroot = runtimeBackend == SessionPrefs.BACKEND_CHROOT
     SettingsPage(
         host, title = stringResource(R.string.perf_title),
         lede = stringResource(R.string.perf_lede),
@@ -123,6 +126,11 @@ fun PerformancePage(
         }
         SettingsGroup(stringResource(R.string.perf_fixes)) {
             ToggleRow(
+                host, "chroot", stringResource(R.string.perf_chroot),
+                if (chroot) stringResource(R.string.perf_chroot_on) else stringResource(R.string.perf_chroot_hint),
+                chroot, onChange = onRuntimeBackend,
+            )
+            ToggleRow(
                 host, "sysmem", stringResource(R.string.perf_sysmem),
                 stringResource(R.string.perf_sysmem_hint),
                 tuSysmem, onChange = onTuSysmem,
@@ -150,13 +158,14 @@ fun PerformancePage(
             ToggleRow(
                 host, "seccomp", stringResource(R.string.perf_seccomp),
                 stringResource(R.string.perf_seccomp_hint),
-                prootNoSeccomp, onChange = onProotNoSeccomp,
+                prootNoSeccomp, enabled = !chroot, onChange = onProotNoSeccomp,
             )
             ToggleRow(
                 host, "fastpath", stringResource(R.string.perf_fastpath),
-                if (prootNoSeccomp) stringResource(R.string.perf_fastpath_needs_seccomp)
+                if (chroot) stringResource(R.string.perf_fastpath_off_chroot)
+                else if (prootNoSeccomp) stringResource(R.string.perf_fastpath_needs_seccomp)
                 else stringResource(R.string.perf_fastpath_hint),
-                prootFastPath && !prootNoSeccomp, enabled = !prootNoSeccomp, onChange = onProotFastPath,
+                prootFastPath && !prootNoSeccomp, enabled = !prootNoSeccomp && !chroot, onChange = onProotFastPath,
             )
         }
         SettingsGroup(stringResource(R.string.perf_identity)) {
