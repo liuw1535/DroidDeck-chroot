@@ -461,6 +461,17 @@ class SessionService : Service() {
         watchLaunchRequests(sessionRoot)
         watchSyncWanted(root)
         EsyncPacks.fetchInBackground(this, root)
+        // The chroot backend's su script + guest pre-redirect stderr would be discarded by
+        // HostProcess when onLine is null; capture them to chroot.log so a failed launch leaves a trace.
+        val chrootLog = if (chroot) File(sessionDir, "chroot.log") else null
+        if (chrootLog != null) {
+            try { chrootLog.writeText("su -c chroot-entry.sh output\n") } catch (e: Exception) {}
+            Log.i(TAG, "chroot: capturing su script output to ${chrootLog.path}")
+        }
+        val lineSink: java.util.function.Consumer<String>? =
+            if (chrootLog != null) java.util.function.Consumer { l ->
+                try { chrootLog.appendText(l + "\n") } catch (e: Exception) {}
+            } else null
         val pid = HostProcess.start(line, hostEnv.asArray(), root, { status ->
             if (gen != sessionGen) {
                 Log.i(TAG, "an earlier session's process ended ($status); the current one carries on")
@@ -468,7 +479,7 @@ class SessionService : Service() {
             }
             Log.i(TAG, "session ended: $status")
             stopSession(status ?: -1)
-        }, null)
+        }, lineSink)
         Log.i(TAG, "session pid $pid, log ${sessionLog.path}")
         if (gen != sessionGen || !SessionState.running) {
             Log.i(TAG, "session stopped while its guest was starting; taking it down")
